@@ -1,0 +1,1210 @@
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import {
+  ArrowUpDown,
+  ArrowLeft,
+  BookOpen,
+  Calendar,
+  ChevronLeft,
+  ChevronRight,
+  Flame,
+  Headphones,
+  LayoutGrid,
+  Library,
+  MessageSquare,
+  PenTool,
+  Search,
+  Settings,
+  Trophy,
+  User,
+  Youtube,
+  FlaskConical,
+  Plus,
+  X,
+  Zap,
+  Palette,
+} from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
+import { useState, useEffect, useRef } from "react";
+import GridLayout, { WidthProvider } from "react-grid-layout/legacy";
+import "react-grid-layout/css/styles.css";
+import "react-resizable/css/styles.css";
+
+import { LiquidCapsuleButton } from "./components/LiquidCapsuleButton";
+import { PackageSelectorDrawer } from "./components/PackageSelectorDrawer";
+import { MODULE_PACKAGES } from "./constants/packages";
+import {
+  CardCategory,
+  FlashcardData,
+  Gender,
+  SRSLevel,
+  ThemeColors,
+  DailyGoal,
+} from "./types";
+import { Flashcard } from "./components/Flashcard";
+import { GlassCard } from "./components/GlassCard";
+import { SettingsScreen } from "./components/SettingsScreen";
+import { BioPortal, StudyState } from "./components/BioPortal";
+import { BottomNav } from "./components/BottomNav";
+import { DynamicHomeBar } from "./components/DynamicHomeBar";
+import { AudioPlayer } from "./components/AudioPlayer";
+import { AddMenu, AVAILABLE_ITEMS } from "./components/AddMenu";
+import { MOCK_FLASHCARDS } from "./constants/mockData";
+import { THEMES } from "./constants/themes";
+
+const ReactGridLayout = WidthProvider(GridLayout);
+type Layout = any;
+
+const initialLayout: Layout[] = [
+  { i: "vocab", x: 0, y: 0, w: 4, h: 2, minW: 2, minH: 1 },
+  { i: "grammar", x: 0, y: 2, w: 2, h: 2, minW: 2, minH: 1 },
+  { i: "listening", x: 2, y: 2, w: 2, h: 2, minW: 2, minH: 1 },
+  { i: "verblab", x: 0, y: 4, w: 2, h: 3, minW: 2, minH: 2 },
+  { i: "stories", x: 2, y: 4, w: 2, h: 2, minW: 2, minH: 1 },
+  { i: "youtube", x: 2, y: 6, w: 2, h: 2, minW: 2, minH: 1 },
+  { i: "smartlib", x: 0, y: 8, w: 4, h: 2, minW: 2, minH: 1 },
+];
+
+type AppView =
+  | "dashboard"
+  | "study"
+  | "grammar-study"
+  | "listening-study"
+  | "verblab-study"
+  | "story-study"
+  | "cinema-study"
+  | "discover"
+  | "dictionary"
+  | "salotto";
+
+import { Discovery } from "./views/Discovery";
+import { Dictionary } from "./views/Dictionary";
+import { GrammarStudyView } from "./views/GrammarStudyView";
+import { ListeningStudyView } from "./views/ListeningStudyView";
+import { VerbLabView } from "./views/VerbLabView";
+import { StoryView } from "./views/StoryView";
+import { CinemaView } from "./views/CinemaView";
+import { SalottoView } from "./views/Salotto";
+import { LaboratorioOverlay } from "./components/LaboratorioOverlay";
+import { UserProfileScreen } from "./views/UserProfileScreen";
+import { UserProfileDrawer } from "./components/UserProfileDrawer";
+import { SettingsDrawer } from "./components/SettingsDrawer";
+import { WordListDrawer } from "./components/WordListDrawer";
+
+export default function App() {
+  const [currentCardIndex, setCurrentCardIndex] = useState(0);
+  const [view, setView] = useState<AppView>("dashboard");
+  const [gridState, setGridState] = useState<Layout[]>(initialLayout);
+  const [showAddMenu, setShowAddMenu] = useState(false);
+  const [isWordListDrawerOpen, setIsWordListDrawerOpen] = useState(false);
+  const [contentVersion, setContentVersion] = useState(1);
+  const [isLabOpen, setIsLabOpen] = useState(false);
+  const grammarStudyBackInterceptorRef = useRef<(() => boolean) | null>(null);
+
+  // Theme State
+  const [currentTheme, setCurrentTheme] = useState(THEMES[0]);
+  const [themeMode, setThemeMode] = useState<"light" | "dark">(
+    currentTheme.mode,
+  );
+
+
+  // Version Check Simulation
+  useEffect(() => {
+    const checkVersion = async () => {
+      // Simulating an API call to Google Sheets / Cloud config
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      const latestVersion = 2; // In real app, this would come from fetch
+      if (latestVersion > contentVersion) {
+        console.log("New content version detected: Refreshing lists...");
+        setContentVersion(latestVersion);
+      }
+    };
+    checkVersion();
+  }, [contentVersion]);
+
+  const handleToggleModule = (id: string) => {
+    const exists = gridState.find((l) => l.i === id);
+    if (exists) {
+      setGridState(gridState.filter((l) => l.i !== id));
+    } else {
+      // Find default config or create one
+      let defaultConfig = initialLayout.find((l) => l.i === id);
+      if (!defaultConfig) {
+        // Find if it's one of the discovery packages
+        // We'll just define some dynamic placement logic
+        defaultConfig = {
+          i: id,
+          x: 0,
+          y: gridState.length * 2,
+          w: 2,
+          h: 2,
+          minW: 2,
+          minH: 1,
+        };
+      }
+      setGridState([...gridState, defaultConfig]);
+    }
+  };
+
+  const handleDiscoveryAdd = (
+    pkg: { id: string; color: string },
+    coords?: { x: number; y: number },
+  ) => {
+    handleToggleModule(pkg.id);
+    if (coords) {
+      setParticleAnimation({ ...coords, color: pkg.color });
+      setTimeout(() => setParticleAnimation(null), 1000);
+    }
+  };
+
+  const [streak, setStreak] = useState(12);
+  const [dailyGoal, setDailyGoal] = useState<DailyGoal>({
+    cardTarget: 20,
+    cardsReviewedToday: 0,
+  });
+  const [isDiscoveryDeepView, setIsDiscoveryDeepView] = useState(false);
+  const [isDictionaryDeepView, setIsDictionaryDeepView] = useState(false);
+  const [selectedPackages, setSelectedPackages] = useState<
+    Record<string, string>
+  >({
+    vocab: "business",
+    grammar: "congiuntivo",
+    listening: "coffee",
+    verblab: "irreg",
+    stories: "pinocchio",
+    youtube: "easy",
+    smartlib: "progetto",
+  });
+
+  const BACKGROUNDS = [
+    { bg: "linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)", mode: "dark" }, // Abstract liquid Blue
+    { bg: "linear-gradient(145deg, #0f172a 0%, #1e293b 100%)", mode: "dark" }, // Slate dark
+    { bg: "linear-gradient(145deg, #111827 0%, #312e81 100%)", mode: "dark" }, // Deep indigo
+    { bg: "linear-gradient(145deg, #09090b 0%, #3f3f46 100%)", mode: "dark" }, // Zinc monochrome
+    { bg: "linear-gradient(145deg, #000000 0%, #064e3b 100%)", mode: "dark" }, // Rich emerald
+    { bg: "linear-gradient(135deg, #1e1b4b 0%, #3b0764 100%)", mode: "dark" }, // Midnight purple
+    { bg: "linear-gradient(135deg, #052e16 0%, #172554 100%)", mode: "dark" }, // Deep forest/ocean
+    { bg: "linear-gradient(145deg, #f8fafc 0%, #e2e8f0 100%)", mode: "light" }, // Clean White Slate
+  ];
+  const [bgIndex, setBgIndex] = useState(1);
+
+  const cycleBackground = () => {
+    setBgIndex((prev) => (prev + 1) % BACKGROUNDS.length);
+  };
+
+  useEffect(() => {
+    setThemeMode(BACKGROUNDS[bgIndex].mode as "light" | "dark");
+  }, [bgIndex]);
+
+  const getSelectedPackageName = (moduleId: string) => {
+    const pkgId = selectedPackages[moduleId];
+    const pkgs = MODULE_PACKAGES[moduleId] || [];
+    const found = pkgs.find((p) => p.id === pkgId);
+    return found ? found.name : "PACKAGES";
+  };
+
+  const handleGenericBack = () => {
+    if (view === "grammar-study" && grammarStudyBackInterceptorRef.current) {
+      const handled = grammarStudyBackInterceptorRef.current();
+      if (handled) return;
+    }
+    if (showAddMenu) {
+      setShowAddMenu(false);
+      return;
+    }
+    if (isLabOpen) {
+      setIsLabOpen(false);
+      return;
+    }
+    if (isPackageSelectorOpen) {
+      setIsPackageSelectorOpen(false);
+      return;
+    }
+    if (isProfileDrawerOpen) {
+      setIsProfileDrawerOpen(false);
+      return;
+    }
+    if (isSettingsDrawerOpen) {
+      setIsSettingsDrawerOpen(false);
+      return;
+    }
+    if (isWordListDrawerOpen) {
+      setIsWordListDrawerOpen(false);
+      return;
+    }
+    if (isDiscoveryDeepView) {
+      setIsDiscoveryDeepView(false);
+      setDiscoveryThemeColor("");
+      return;
+    }
+    if (isDictionaryDeepView) {
+      setIsDictionaryDeepView(false);
+      return;
+    }
+    if (
+      view === "study" ||
+      view === "grammar-study" ||
+      view === "listening-study" ||
+      view === "verblab-study" ||
+      view === "story-study" ||
+      view === "cinema-study"
+    ) {
+      setView("dashboard");
+      return;
+    }
+  };
+
+  const handleHomeTap = () => {
+    if (view !== "dashboard") {
+      setView("dashboard");
+    }
+  };
+  const [isHeatmapExpanded, setIsHeatmapExpanded] = useState(false);
+  const [discoveryThemeColor, setDiscoveryThemeColor] = useState("");
+  const [particleAnimation, setParticleAnimation] = useState<{
+    x: number;
+    y: number;
+    color: string;
+  } | null>(null);
+
+  const handlePackageSelect = (moduleId: string, packageId: string) => {
+    setSelectedPackages((prev) => ({ ...prev, [moduleId]: packageId }));
+
+    // Inject particle animation logic
+    // Find the tile position (approximate or just from center to bottom)
+    setParticleAnimation({
+      x: window.innerWidth / 2,
+      y: window.innerHeight / 2,
+      color: "#3b82f6", // Default blue glow for injection
+    });
+    setTimeout(() => setParticleAnimation(null), 1000);
+  };
+
+  const handleAnswer = (level: SRSLevel) => {
+    console.log(`Answered ${level}`);
+    setDailyGoal((prev) => ({
+      ...prev,
+      cardsReviewedToday: prev.cardsReviewedToday + 1,
+    }));
+    handleNextCard();
+  };
+
+  const ALL_PORTAL_STATES: StudyState[] = [
+    "IDLE",
+    "CONSISTENCY",
+    "HIGH_ENERGY",
+    "DEEP_FOCUS",
+    "RAPID",
+    "LEVEL_UP",
+    "DROPPING",
+    "HIGH_ERROR",
+    "INACTIVE",
+    "COMPLETED",
+  ];
+  const [portalState, setPortalState] = useState<StudyState>("IDLE");
+  const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
+  const [isPackageSelectorOpen, setIsPackageSelectorOpen] = useState(false);
+  const [selectorModuleId, setSelectorModuleId] = useState<string | null>(null);
+  const [expandedModule, setExpandedModule] = useState<
+    "vocab" | "grammar" | null
+  >(null);
+  const [isProfileDrawerOpen, setIsProfileDrawerOpen] = useState(false);
+  const [isSettingsDrawerOpen, setIsSettingsDrawerOpen] = useState(false);
+
+  const [uiScale, setUiScale] = useState<"small" | "medium" | "large">(
+    "medium",
+  );
+
+  // Apply CSS Variables instantly
+  useEffect(() => {
+    const root = document.documentElement;
+    root.style.setProperty("--theme-gradient", currentTheme.gradient);
+    root.style.setProperty("--theme-accent", currentTheme.accent);
+    root.style.setProperty("--theme-glow", currentTheme.glow);
+
+    // UI Scaling Map
+    const scaleFactorMap = {
+      small: "0.8",
+      medium: "1.0",
+      large: "1.2",
+    };
+    const fontSizeMap = {
+      small: "12px",
+      medium: "16px",
+      large: "20px",
+    };
+    root.style.setProperty("--ui-factor", scaleFactorMap[uiScale]);
+    root.style.setProperty("--font-base", fontSizeMap[uiScale]);
+
+    // Parse the tailwind class string into individual parts.
+    // E.g., '!border-rose-300/30 shadow-[inset_0_1px_2px_rgba(251,146,60,0.2),0_10px_40px_rgba(244,114,182,0.1)] !bg-pink-100/[0.02]'
+
+    // In Light mode, we adjust some global contrasts
+    if (themeMode === "light") {
+      root.style.setProperty("--theme-bg-brightness", "1.1");
+      root.style.setProperty("--theme-overlay-opacity", "0.05");
+    } else {
+      root.style.setProperty("--theme-bg-brightness", "1");
+      root.style.setProperty("--theme-overlay-opacity", "0.2");
+    }
+
+    const bgMatch = currentTheme.navGlassClass?.match(
+      /bg-([A-Za-z0-9-\/\[\]\.]+)/,
+    );
+    const borderMatch = currentTheme.navGlassClass?.match(
+      /border-([A-Za-z0-9-\/\[\]\.]+)/,
+    );
+    const shadowMatch =
+      currentTheme.navGlassClass?.match(/shadow-\[([^\]]+)\]/);
+    const cardBgMatch = currentTheme.cardGlassClass?.match(
+      /bg-([A-Za-z0-9-\/\[\]\.]+)/,
+    );
+    const cardBorderMatch = currentTheme.cardGlassClass?.match(
+      /border-([A-Za-z0-9-\/\[\]\.]+)/,
+    );
+    const cardShadowMatch =
+      currentTheme.cardGlassClass?.match(/shadow-\[([^\]]+)\]/);
+
+    // Provide some fallback defaults
+    root.style.setProperty(
+      "--theme-nav-shadow",
+      shadowMatch
+        ? shadowMatch[1].replace(/_/g, " ")
+        : "inset 0 1px 2px rgba(255,255,255,0.1), 0 10px 40px rgba(0,0,0,0.4)",
+    );
+    root.style.setProperty(
+      "--theme-card-shadow",
+      cardShadowMatch
+        ? cardShadowMatch[1].replace(/_/g, " ")
+        : "0 0 30px rgba(255,255,255,0.05)",
+    );
+
+    // For demonstration, instead of parsing bg/border tailwind classes to raw rgba directly, we can just use the provided actual colors in THEMES object later if needed.
+    // But since the setup uses generic variables now, this removes glitches.
+    // The classes themselves can be removed from Daily Mastery component in favor of the shadow/border variables.
+  }, [currentTheme, uiScale]);
+
+  const handleNextCard = () => {
+    if (currentCardIndex < MOCK_FLASHCARDS.length - 1) {
+      setCurrentCardIndex(currentCardIndex + 1);
+    } else {
+      setView("dashboard");
+      setCurrentCardIndex(0);
+    }
+  };
+
+  const isStudying = view === "study";
+  const isDarkMode = themeMode === "dark";
+  const textColor = isDarkMode ? "text-white" : "text-slate-900";
+  const mutedTextColor = isDarkMode ? "text-white/40" : "text-slate-500";
+
+  return (
+    <>
+      <div
+        className={`fixed inset-0 z-[100] bg-black/90 transition-all duration-300 ${activeDropdown ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"}`}
+        style={{ background: "rgba(0, 0, 0, 0.6)" }}
+        onClick={() => setActiveDropdown(null)}
+      />
+      <AudioPlayer url={currentTheme.ambientSoundUrl} />
+
+      {/* Orientation Blocker */}
+      <div
+        id="orientation-lock"
+        className="hidden fixed inset-0 z-[9999] bg-[#030712] flex-col items-center justify-center p-8 text-center space-y-6"
+      >
+        <div className="w-20 h-20 rounded-3xl border-4 border-dashed border-white/20 flex items-center justify-center animate-pulse">
+          <Settings className="w-10 h-10 text-white/40 rotate-90" />
+        </div>
+        <div className="space-y-2">
+          <h2 className="text-xl font-bold text-white">
+            Please rotate your device
+          </h2>
+          <p className="text-white/40 text-sm">
+            Vero is designed for portrait mode only.
+          </p>
+        </div>
+      </div>
+
+      <div
+        className={`relative w-full font-sans selection:bg-white/20 transition-all duration-300 ease-in-out h-screen overflow-hidden ${themeMode === "light" ? "theme-light" : "theme-dark"} ${activeDropdown || isPackageSelectorOpen ? "scale-[0.98]" : "scale-100"}`}
+        style={{ background: "transparent" }}
+      >
+        <div
+          className={`fixed inset-0 z-[190] bg-black/80 transition-all duration-500 ${isPackageSelectorOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"}`}
+          style={{ background: "rgba(0, 0, 0, 0.4)" }}
+        />
+        <div
+          className="fixed inset-0 pointer-events-none z-0 venice-background"
+          style={{
+            background: BACKGROUNDS[bgIndex].bg,
+          }}
+        ></div>
+
+        <AnimatePresence>
+          {view === "dashboard" && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 0.4 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 1 }}
+              className="fixed inset-0 pointer-events-none z-0 overflow-hidden"
+            >
+              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/80 z-10" />
+              <motion.div
+                className="absolute left-0 right-0 w-full top-0"
+                style={{
+                  height: "250%",
+                  backgroundImage:
+                    'url("https://images.unsplash.com/photo-1514890547357-a9ee288728e0?auto=format&fit=crop&q=80&w=800&h=1600")',
+                  backgroundSize: "cover",
+                  backgroundPosition: "center top",
+                }}
+                animate={{ y: ["-15%", "-60%"] }}
+                transition={{ duration: 120, repeat: Infinity, ease: "linear" }}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Main Container */}
+        <div
+          className={`relative z-10 max-w-[26.875rem] mx-auto flex flex-col pt-safe h-full overflow-hidden px-3`}
+        >
+          {/* Floating Top Elements */}
+          <div className="absolute top-0 left-0 right-0 w-full pt-8 px-3 pointer-events-none z-[150] flex justify-between items-start">
+            {/* Left Box: Profile */}
+            <div className="pointer-events-auto flex items-center h-12">
+              {view === "dashboard" && (
+                <button
+                  onClick={() => setIsProfileDrawerOpen(true)}
+                  className={`flex items-center p-1.5 rounded-full border ${isDarkMode ? "border-white/10 bg-white/5 hover:bg-white/10" : "border-slate-200 bg-white/80 hover:bg-white/100"} bg-black/60 transition-all shadow-lg group`}
+                >
+                  <div
+                    className={`w-9 h-9 rounded-full overflow-hidden border-2 transition-all ${isDarkMode ? "border-white/20 group-hover:border-white/40" : "border-slate-200 group-hover:border-slate-300"}`}
+                  >
+                    <img
+                      src="https://images.unsplash.com/photo-1560250097-0b93528c311a?q=80&w=256&auto=format&fit=crop"
+                      alt="Profile"
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                </button>
+              )}
+            </div>
+
+            {/* Middle Spacer removed */}
+
+            {/* Right Box: Actions */}
+            <div className="flex items-center gap-3 pointer-events-auto h-12">
+              {view === "dashboard" && (
+                <button
+                  onClick={cycleBackground}
+                  className={`w-11 h-11 flex items-center justify-center glass rounded-full border ${isDarkMode ? "border-white/10 bg-white/5" : "border-slate-200 bg-white/80"} bg-black/50 hover:bg-white/20 transition-all duration-300 shadow-lg`}
+                >
+                  <Palette size={20} className={isDarkMode ? "text-white" : "text-slate-800"} />
+                </button>
+              )}
+              {(view === "dashboard" || view === "study") && (
+                <button
+                  onClick={() =>
+                    view === "study"
+                      ? setIsWordListDrawerOpen(true)
+                      : setShowAddMenu(!showAddMenu)
+                  }
+                  className={`w-11 h-11 flex flex-col items-center justify-center glass rounded-full border ${isDarkMode ? "border-white/10 bg-white/5" : "border-slate-200 bg-white/80"} bg-black/50 hover:bg-white/20 transition-all duration-300 shadow-lg relative`}
+                  style={{
+                    transform: showAddMenu ? "rotate(-90deg)" : "rotate(0deg)",
+                  }}
+                >
+                  <div className="flex flex-col items-center justify-center gap-[4px] w-[18px]">
+                    <div
+                      className={`w-full h-[2.5px] rounded-full transition-all duration-300 ${isDarkMode ? "bg-white" : "bg-slate-800"}`}
+                      style={{
+                        transformOrigin: "left",
+                        transform: showAddMenu
+                          ? "translateY(6px) rotate(-45deg)"
+                          : "translateY(0) rotate(0)",
+                        zIndex: 2,
+                      }}
+                    />
+                    <div
+                      className={`w-full h-[2.5px] rounded-full transition-all duration-300 ${isDarkMode ? "bg-white" : "bg-slate-800"}`}
+                      style={{
+                        opacity: showAddMenu ? 0 : 1,
+                        transform: showAddMenu
+                          ? "translateX(10px)"
+                          : "translateX(0)",
+                        zIndex: 1,
+                      }}
+                    />
+                    <div
+                      className={`w-full h-[2.5px] rounded-full transition-all duration-300 ${isDarkMode ? "bg-white" : "bg-slate-800"}`}
+                      style={{
+                        transformOrigin: "left",
+                        transform: showAddMenu
+                          ? "translateY(-6px) rotate(45deg)"
+                          : "translateY(0) rotate(0)",
+                        zIndex: 2,
+                      }}
+                    />
+                  </div>
+                </button>
+              )}
+            </div>
+          </div>
+
+          <AnimatePresence mode="wait">
+            {view === "dashboard" && (
+              <motion.main
+                key="dashboard"
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                className="flex-1 flex flex-col justify-around min-h-0 mt-2 py-4 gap-4 z-20"
+              >
+                {/* Asymmetrical Bento Grid - Dynamic Ecosystem */}
+                <div className="w-full h-full overflow-y-auto pb-32 scrollbar-hide pt-24 font-sans relative">
+                  <ReactGridLayout
+                    className="layout"
+                    layout={gridState}
+                    cols={4}
+                    rowHeight={65}
+                    onLayoutChange={(newLayout: any) => setGridState(newLayout)}
+                    isDraggable={false}
+                    isResizable={false}
+                    margin={[12, 12]}
+                    containerPadding={[0, 0]}
+                    compactType="vertical"
+                    useCSSTransforms={true}
+                  >
+                    {/* Top Level: Main Vocabulary Hub */}
+                    {gridState.some((l) => l.i === "vocab") && (
+                      <div
+                        key="vocab"
+                        className="glassContainer glass-refraction group active:scale-95 transition-transform duration-200 w-full h-full"
+                      >
+                        <div
+                          className="w-full h-full cursor-pointer rounded-[24px] overflow-hidden relative @container"
+                          onClick={() => setView("study")}
+                        >
+                          <div className="absolute inset-0 pointer-events-none overflow-hidden">
+                            {/* Abstract Modern Typography Ghost */}
+                            <motion.div
+                              className="absolute -right-4 -top-8 text-[12cqw] @xs:text-[8rem] font-serif italic text-blue-500/[0.04] select-none pointer-events-none leading-none opacity-50"
+                              animate={{ y: [0, -10, 0], rotate: [0, -2, 0] }}
+                              transition={{
+                                duration: 8,
+                                repeat: Infinity,
+                                ease: "easeInOut",
+                              }}
+                            >
+                              a
+                            </motion.div>
+                            {/* Minimal Ambient Glow */}
+                            <motion.div
+                              className="absolute -right-10 -bottom-10 w-32 h-32 rounded-full"
+                              style={{
+                                background:
+                                  "radial-gradient(circle, rgba(59, 130, 246, 0.15) 0%, transparent 70%)",
+                              }}
+                              animate={{
+                                scale: [1, 1.2, 1],
+                                opacity: [0.4, 0.8, 0.4],
+                              }}
+                              transition={{
+                                duration: 6,
+                                repeat: Infinity,
+                                ease: "easeInOut",
+                              }}
+                            />
+                            <div className="absolute top-0 right-0 w-[1px] h-full bg-gradient-to-b from-blue-500/20 to-transparent" />
+                          </div>
+                          <div className="relative z-10 w-full h-full p-3 @sm:p-4 flex flex-col justify-center items-center gap-2 text-center">
+                            <div
+                              className="w-12 h-12 @xs:w-14 @xs:h-14 glassBtn shrink-0 mb-1"
+                              style={{
+                                backgroundColor: "rgba(59, 130, 246, 0.1)",
+                              }}
+                            >
+                              <BookOpen className="w-6 h-6 @xs:w-7 @xs:h-7 text-blue-400" />
+                            </div>
+                            <h3
+                              className={
+                                isDarkMode
+                                  ? "text-[clamp(1rem,8cqw,1.2rem)] font-bold text-white/95 tracking-tight"
+                                  : "text-[clamp(1rem,8cqw,1.2rem)] font-bold text-slate-800 tracking-tight"
+                              }
+                            >
+                              Vocabulary
+                            </h3>
+                            <div className="mt-2 animate-fade-in w-full flex justify-center">
+                              <LiquidCapsuleButton
+                                label={getSelectedPackageName("vocab")}
+                                onClick={() => {
+                                  setSelectorModuleId("vocab");
+                                  setIsPackageSelectorOpen(true);
+                                }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Grammar Module */}
+                    {gridState.some((l) => l.i === "grammar") && (
+                      <div
+                        key="grammar"
+                        className="glassContainer glass-refraction group active:scale-95 transition-transform duration-200 w-full h-full"
+                      >
+                        <div
+                          className="w-full h-full cursor-pointer rounded-[24px] overflow-hidden relative @container"
+                          onClick={() => setView("grammar-study")}
+                        >
+                          <div className="relative z-10 w-full h-full p-3 @sm:p-4 flex flex-col justify-center items-center gap-2 text-center">
+                            <div
+                              className="w-12 h-12 @xs:w-14 @xs:h-14 glassBtn shrink-0 mb-1"
+                              style={{
+                                backgroundColor: "rgba(16, 185, 129, 0.1)",
+                              }}
+                            >
+                              <MessageSquare className="w-6 h-6 @xs:w-7 @xs:h-7 text-emerald-400" />
+                            </div>
+                            <h3
+                              className={
+                                isDarkMode
+                                  ? "text-[clamp(1rem,8cqw,1.2rem)] font-bold text-white/95 tracking-tight"
+                                  : "text-[clamp(1rem,8cqw,1.2rem)] font-bold text-slate-800 tracking-tight"
+                              }
+                            >
+                              Grammar
+                            </h3>
+                            <div className="mt-2 animate-fade-in w-full flex justify-center">
+                              <LiquidCapsuleButton
+                                label={getSelectedPackageName("grammar")}
+                                onClick={() => {
+                                  setSelectorModuleId("grammar");
+                                  setIsPackageSelectorOpen(true);
+                                }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Listening Module */}
+                    {gridState.some((l) => l.i === "listening") && (
+                      <div
+                        key="listening"
+                        className="glassContainer glass-refraction group active:scale-95 transition-transform duration-200 w-full h-full"
+                      >
+                        <div
+                          className="w-full h-full cursor-pointer rounded-[24px] overflow-hidden relative @container"
+                          onClick={() => setView("listening-study")}
+                        >
+                          <div className="relative z-10 w-full h-full p-3 @sm:p-4 flex flex-col justify-center items-center gap-2 text-center">
+                            <div
+                              className="w-12 h-12 @xs:w-14 @xs:h-14 glassBtn shrink-0 mb-1"
+                              style={{
+                                backgroundColor: "rgba(168, 85, 247, 0.1)",
+                              }}
+                            >
+                              <Headphones className="w-6 h-6 @xs:w-7 @xs:h-7 text-purple-400" />
+                            </div>
+                            <h3
+                              className={
+                                isDarkMode
+                                  ? "text-[clamp(1rem,8cqw,1.2rem)] font-bold text-white/95 tracking-tight"
+                                  : "text-[clamp(1rem,8cqw,1.2rem)] font-bold text-slate-800 tracking-tight"
+                              }
+                            >
+                              Listening
+                            </h3>
+                            <div className="mt-2 animate-fade-in w-full flex justify-center">
+                              <LiquidCapsuleButton
+                                label={getSelectedPackageName("listening")}
+                                onClick={() => {
+                                  setSelectorModuleId("listening");
+                                  setIsPackageSelectorOpen(true);
+                                }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Verb Lab Module */}
+                    {gridState.some((l) => l.i === "verblab") && (
+                      <div
+                        key="verblab"
+                        className="glassContainer glass-refraction group active:scale-95 transition-transform duration-200 w-full h-full"
+                      >
+                        <div
+                          className="w-full h-full cursor-pointer rounded-[24px] overflow-hidden relative @container"
+                          onClick={() => setView("verblab-study")}
+                        >
+                          <div className="relative z-10 w-full h-full p-3 @sm:p-4 flex flex-col justify-center items-center gap-2 text-center">
+                            <div
+                              className="w-12 h-12 @xs:w-14 @xs:h-14 glassBtn shrink-0 mb-1"
+                              style={{
+                                backgroundColor: "rgba(236, 72, 153, 0.1)",
+                              }}
+                            >
+                              <FlaskConical className="w-6 h-6 @xs:w-7 @xs:h-7 text-pink-400" />
+                            </div>
+                            <h3
+                              className={
+                                isDarkMode
+                                  ? "text-[clamp(1rem,8cqw,1.2rem)] font-bold text-white/95 tracking-tight"
+                                  : "text-[clamp(1rem,8cqw,1.2rem)] font-bold text-slate-800 tracking-tight"
+                              }
+                            >
+                              Verbs
+                            </h3>
+                            <div className="mt-2 animate-fade-in w-full flex justify-center">
+                              <LiquidCapsuleButton
+                                label={getSelectedPackageName("verblab")}
+                                onClick={() => {
+                                  setSelectorModuleId("verblab");
+                                  setIsPackageSelectorOpen(true);
+                                }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Stories & Texts */}
+                    {gridState.some((l) => l.i === "stories") && (
+                      <div
+                        key="stories"
+                        className="glassContainer glass-refraction group active:scale-95 transition-transform duration-200 w-full h-full"
+                      >
+                        <div
+                          className="w-full h-full cursor-pointer rounded-[24px] overflow-hidden relative @container"
+                          onClick={() => setView("story-study")}
+                        >
+                          <div className="relative z-10 w-full h-full p-3 @sm:p-4 flex flex-col justify-center items-center gap-2 text-center">
+                            <div
+                              className="w-12 h-12 @xs:w-14 @xs:h-14 glassBtn shrink-0 mb-1"
+                              style={{
+                                backgroundColor: "rgba(245, 158, 11, 0.1)",
+                              }}
+                            >
+                              <PenTool className="w-6 h-6 @xs:w-7 @xs:h-7 text-amber-400" />
+                            </div>
+                            <h3
+                              className={
+                                isDarkMode
+                                  ? "text-[clamp(1rem,8cqw,1.2rem)] font-bold text-white/95 tracking-tight"
+                                  : "text-[clamp(1rem,8cqw,1.2rem)] font-bold text-slate-800 tracking-tight"
+                              }
+                            >
+                              Stories
+                            </h3>
+                            <div className="mt-2 animate-fade-in w-full flex justify-center">
+                              <LiquidCapsuleButton
+                                label={getSelectedPackageName("stories")}
+                                onClick={() => {
+                                  setSelectorModuleId("stories");
+                                  setIsPackageSelectorOpen(true);
+                                }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* YouTube Videos */}
+                    {gridState.some((l) => l.i === "youtube") && (
+                      <div
+                        key="youtube"
+                        className="glassContainer glass-refraction group active:scale-95 transition-transform duration-200 w-full h-full"
+                      >
+                        <div
+                          className="w-full h-full cursor-pointer rounded-[24px] overflow-hidden relative @container"
+                          onClick={() => setView("cinema-study")}
+                        >
+                          <div className="relative z-10 w-full h-full p-3 @sm:p-4 flex flex-col justify-center items-center gap-2 text-center">
+                            <div
+                              className="w-12 h-12 @xs:w-14 @xs:h-14 glassBtn shrink-0 mb-1"
+                              style={{
+                                backgroundColor: "rgba(239, 68, 68, 0.1)",
+                              }}
+                            >
+                              <Youtube className="w-6 h-6 @xs:w-7 @xs:h-7 text-red-400" />
+                            </div>
+                            <h3
+                              className={
+                                isDarkMode
+                                  ? "text-[clamp(1rem,8cqw,1.2rem)] font-bold text-white/95 tracking-tight"
+                                  : "text-[clamp(1rem,8cqw,1.2rem)] font-bold text-slate-800 tracking-tight"
+                              }
+                            >
+                              Cinema
+                            </h3>
+                            <div className="mt-2 animate-fade-in w-full flex justify-center">
+                              <LiquidCapsuleButton
+                                label={getSelectedPackageName("youtube")}
+                                onClick={() => {
+                                  setSelectorModuleId("youtube");
+                                  setIsPackageSelectorOpen(true);
+                                }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Smart Library */}
+                    {gridState.some((l) => l.i === "smartlib") && (
+                      <div
+                        key="smartlib"
+                        className="glassContainer glass-refraction group active:scale-95 transition-transform duration-200 w-full h-full"
+                      >
+                        <div
+                          className="w-full h-full cursor-pointer rounded-[24px] overflow-hidden relative @container"
+                          onClick={() => setView("study")}
+                        >
+                          <div className="relative z-10 w-full h-full p-3 @sm:p-4 flex flex-col justify-center items-center gap-2 text-center">
+                            <div
+                              className="w-12 h-12 @xs:w-14 @xs:h-14 glassBtn shrink-0 mb-1"
+                              style={{
+                                backgroundColor: "rgba(6, 182, 212, 0.1)",
+                              }}
+                            >
+                              <Library className="w-6 h-6 @xs:w-7 @xs:h-7 text-cyan-400" />
+                            </div>
+                            <h3
+                              className={
+                                isDarkMode
+                                  ? "text-[clamp(1rem,8cqw,1.2rem)] font-bold text-white/95 tracking-tight"
+                                  : "text-[clamp(1rem,8cqw,1.2rem)] font-bold text-slate-800 tracking-tight"
+                              }
+                            >
+                              Library
+                            </h3>
+                            <div className="mt-2 animate-fade-in w-full flex justify-center">
+                              <LiquidCapsuleButton
+                                label={getSelectedPackageName("smartlib")}
+                                onClick={() => {
+                                  setSelectorModuleId("smartlib");
+                                  setIsPackageSelectorOpen(true);
+                                }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </ReactGridLayout>
+                </div>
+              </motion.main>
+            )}
+
+            {view === "discover" && (
+              <motion.main
+                key="discover"
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 1.05 }}
+                className="flex-1 flex flex-col justify-around min-h-0 mt-2 py-4 gap-4 z-20"
+              >
+                <Discovery
+                  onAddPackage={handleDiscoveryAdd}
+                  activePackageIds={gridState.map((l) => l.i)}
+                  themeColor={discoveryThemeColor}
+                  setThemeColor={setDiscoveryThemeColor}
+                  isDarkMode={themeMode === "dark"}
+                  onDeepViewChange={setIsDiscoveryDeepView}
+                  isDeepView={isDiscoveryDeepView}
+                />
+              </motion.main>
+            )}
+
+            {view === "dictionary" && (
+              <motion.main
+                key="dictionary"
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 1.05 }}
+                className="flex-1 min-h-0 pt-2 pb-6 z-20 flex flex-col"
+              >
+                <Dictionary isDarkMode={isDarkMode} currentTheme={currentTheme} />
+              </motion.main>
+            )}
+
+            {view === "grammar-study" && (
+              <motion.main
+                key="grammar-study"
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 1.1 }}
+                className="h-[90%] w-full flex flex-col items-center absolute inset-0 z-50"
+              >
+                <GrammarStudyView
+                  onBack={handleGenericBack}
+                  isDarkMode={isDarkMode}
+                  onStartStudy={() => setView("study")}
+                  onRegisterBackInterceptor={(fn) => {
+                    grammarStudyBackInterceptorRef.current = fn;
+                  }}
+                  currentTheme={currentTheme}
+                />
+              </motion.main>
+            )}
+
+            {view === "story-study" && (
+              <motion.main
+                key="story-study"
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 1.1 }}
+                className="h-[90%] w-full flex flex-col items-center absolute inset-0 z-50"
+              >
+                <StoryView onBack={handleGenericBack} isDarkMode={isDarkMode} currentTheme={currentTheme} />
+              </motion.main>
+            )}
+
+            {view === "cinema-study" && (
+              <motion.main
+                key="cinema-study"
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 1.1 }}
+                className="h-[90%] w-full flex flex-col items-center absolute inset-0 z-50"
+              >
+                <CinemaView
+                  onBack={handleGenericBack}
+                  isDarkMode={isDarkMode}
+                  currentTheme={currentTheme}
+                />
+              </motion.main>
+            )}
+
+            {view === "listening-study" && (
+              <motion.main
+                key="listening-study"
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 1.1 }}
+                className="h-[90%] w-full flex flex-col items-center absolute inset-0 z-50"
+              >
+                <ListeningStudyView
+                  onBack={handleGenericBack}
+                  isDarkMode={isDarkMode}
+                  currentTheme={currentTheme}
+                />
+              </motion.main>
+            )}
+
+            {view === "verblab-study" && (
+              <motion.main
+                key="verblab-study"
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 1.1 }}
+                className="h-[90%] w-full flex flex-col items-center absolute inset-0 z-50"
+              >
+                <VerbLabView
+                  onBack={handleGenericBack}
+                  isDarkMode={isDarkMode}
+                  currentTheme={currentTheme}
+                />
+              </motion.main>
+            )}
+
+            {view === "study" && (
+              <motion.main
+                key="study-mode"
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 1.1 }}
+                className="h-full flex flex-col items-center pt-24 pb-32"
+              >
+                <div className="w-full flex justify-center items-center flex-1 min-h-0">
+                  {MOCK_FLASHCARDS[currentCardIndex] ? (
+                    <Flashcard
+                      key={MOCK_FLASHCARDS[currentCardIndex].id}
+                      data={MOCK_FLASHCARDS[currentCardIndex]}
+                      onAnswer={handleAnswer}
+                    />
+                  ) : (
+                    <div className="text-white/20">Card not found</div>
+                  )}
+                </div>
+              </motion.main>
+            )}
+
+            {view === "salotto" && <SalottoView isDarkMode={isDarkMode} currentTheme={currentTheme} />}
+          </AnimatePresence>
+
+          {/* Navigation Components */}
+          <div className="absolute bottom-2 left-6 right-6 pointer-events-none z-[150] flex flex-col items-center justify-end pb-safe">
+            <AnimatePresence mode="wait">
+              {(view === "dashboard" ||
+                view === "discover" ||
+                view === "dictionary" ||
+                view === "salotto") &&
+              !isDiscoveryDeepView ? (
+                <motion.div
+                  key="bottom-nav"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 20 }}
+                  className="pointer-events-auto w-full flex items-center justify-between px-2"
+                >
+                  {/* Left External Button Placeholder */}
+                  <button
+                    onClick={() => setIsProfileDrawerOpen(true)}
+                    className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 border transition-all duration-300 ${themeMode === "dark" ? "border-white/5 text-white/50 bg-white/0 active:bg-white/10 active:text-white" : "border-slate-300/30 text-slate-400 bg-white/30 active:bg-white/90 active:text-slate-800"} backdrop-blur-sm active:scale-125 hover:opacity-100`}
+                  >
+                    <User size={16} />
+                  </button>
+
+                  <BottomNav
+                    view={view as any}
+                    setView={setView as any}
+                    portalState={portalState}
+                    currentTheme={currentTheme}
+                    discoveryThemeColor={discoveryThemeColor}
+                    isDarkMode={themeMode === "dark"}
+                    onOpenLab={() => setIsLabOpen(true)}
+                  />
+
+                  {/* Right External Button Placeholder */}
+                  <button
+                    onClick={() => setIsSettingsDrawerOpen(true)}
+                    className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 border transition-all duration-300 ${themeMode === "dark" ? "border-white/5 text-white/50 bg-white/0 active:bg-white/10 active:text-white" : "border-slate-300/30 text-slate-400 bg-white/30 active:bg-white/90 active:text-slate-800"} backdrop-blur-sm active:scale-125 hover:opacity-100`}
+                  >
+                    <Settings size={16} />
+                  </button>
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="home-bar"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 20 }}
+                  className="pointer-events-auto w-full flex justify-center"
+                >
+                  <DynamicHomeBar
+                    onTap={handleGenericBack}
+                    onSwipeUp={handleGenericBack}
+                    onLongPress={() => setView("dashboard")}
+                    isDarkMode={themeMode === "dark"}
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        </div>
+        <AddMenu
+          isOpen={showAddMenu}
+          onClose={() => setShowAddMenu(false)}
+          activeIds={gridState.map((l) => l.i)}
+          onToggle={handleToggleModule}
+        />
+
+        <PackageSelectorDrawer
+          isOpen={isPackageSelectorOpen}
+          onClose={() => setIsPackageSelectorOpen(false)}
+          moduleId={selectorModuleId}
+          selectedPackageId={
+            selectorModuleId ? selectedPackages[selectorModuleId] : ""
+          }
+          onSelect={(pkgId) =>
+            selectorModuleId && handlePackageSelect(selectorModuleId, pkgId)
+          }
+        />
+
+        <UserProfileDrawer
+          isOpen={isProfileDrawerOpen}
+          onClose={() => setIsProfileDrawerOpen(false)}
+          isDarkMode={themeMode === "dark"}
+          uiScale={uiScale}
+          setUiScale={setUiScale}
+          themeMode={themeMode}
+          setThemeMode={(mode) => {
+            setThemeMode(mode);
+            const compatibleTheme = THEMES.find((t) => t.mode === mode);
+            if (compatibleTheme) setCurrentTheme(compatibleTheme);
+          }}
+          dailyGoal={dailyGoal}
+          setDailyGoal={setDailyGoal}
+        />
+
+        <SettingsDrawer
+          isOpen={isSettingsDrawerOpen}
+          onClose={() => setIsSettingsDrawerOpen(false)}
+          isDarkMode={themeMode === "dark"}
+          uiScale={uiScale}
+          setUiScale={setUiScale}
+          themeMode={themeMode}
+          setThemeMode={(mode) => {
+            setThemeMode(mode);
+            const compatibleTheme = THEMES.find((t) => t.mode === mode);
+            if (compatibleTheme) setCurrentTheme(compatibleTheme);
+          }}
+          dailyGoal={dailyGoal}
+          setDailyGoal={setDailyGoal}
+        />
+
+        <WordListDrawer
+          isOpen={isWordListDrawerOpen}
+          onClose={() => setIsWordListDrawerOpen(false)}
+          isDarkMode={themeMode === "dark"}
+        />
+
+        <LaboratorioOverlay
+          isOpen={isLabOpen}
+          onClose={() => setIsLabOpen(false)}
+          isDarkMode={themeMode === "dark"}
+        />
+
+        {/* Global Particle Animation */}
+        <AnimatePresence>
+          {particleAnimation && (
+            <motion.div
+              initial={{
+                x: particleAnimation.x - 20,
+                y: particleAnimation.y - 20,
+                opacity: 1,
+                scale: 1,
+              }}
+              animate={{
+                x: window.innerWidth / 2 - 20,
+                y: window.innerHeight - 80,
+                opacity: [1, 0.8, 0],
+                scale: [1, 1.5, 0.2],
+                filter: ["blur(0px)", "blur(5px)", "blur(20px)"],
+              }}
+              transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
+              className="fixed z-[9999] w-10 h-10 rounded-2xl pointer-events-none flex items-center justify-center border border-white/30 bg-black/60"
+              style={{
+                background: `linear-gradient(135deg, ${particleAnimation.color}80, ${particleAnimation.color}20)`,
+                boxShadow: `0 0 40px ${particleAnimation.color}60`,
+              }}
+            >
+              <Zap className="w-5 h-5 text-white" />
+              <motion.div
+                className="absolute inset-0 rounded-2xl"
+                animate={{ opacity: [0, 1, 0], scale: [1, 2, 2.5] }}
+                transition={{ duration: 1, repeat: Infinity }}
+                style={{ border: `2px solid ${particleAnimation.color}` }}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </>
+  );
+}
