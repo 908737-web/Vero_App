@@ -1,9 +1,10 @@
+/* cspell:ignore d'Ascolto */
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   ArrowLeft, Play, Pause, SkipBack, SkipForward, Headphones, Clock, Lock, Check,
   Volume2, HelpCircle, Award, BookOpen, Music, CheckCircle2, RotateCcw,
-  ChevronLeft
+  ChevronLeft, Settings2, Eye, EyeOff
 } from 'lucide-react';
 import { CircularEqualizer } from '../components/CircularEqualizer';
 import { ThemeColors } from '../types';
@@ -149,6 +150,11 @@ export const ListeningStudyView: React.FC<ListeningStudyViewProps> = ({ onBack, 
   }, []);
 
   const [activePanel, setActivePanel] = useState<'transcript' | 'vocabulary' | 'challenge'>('transcript');
+
+  // Subtitle overlay visibility toggles
+  const [showItalianSub, setShowItalianSub] = useState(true);
+  const [showEnglishSub, setShowEnglishSub] = useState(true);
+  const [showSubControls, setShowSubControls] = useState(false);
   
   // Custom decryption vocabulary signals state
   const [decryptedWords, setDecryptedWords] = useState<Record<string, boolean>>({});
@@ -587,13 +593,13 @@ export const ListeningStudyView: React.FC<ListeningStudyViewProps> = ({ onBack, 
                 initial={{ opacity: 0, scale: 0.98 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.98 }}
-                className="flex-1 flex flex-col h-full pt-20 px-4 min-h-0"
+                className="flex-1 flex flex-col h-full pt-12 px-4 min-h-0"
               >
                 {/* H2 Title precisely above the player */}
                 <motion.div 
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="mb-6 text-center select-none"
+                  className="mb-3 text-center select-none"
                 >
                   <h2 className={`text-2xl font-black tracking-tighter ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
                     {activeTrack.title}
@@ -601,7 +607,7 @@ export const ListeningStudyView: React.FC<ListeningStudyViewProps> = ({ onBack, 
                 </motion.div>
 
                 {/* FLATTENED FLOATING PLAYER CONTROLS */}
-                <div className="flex items-center justify-between w-full max-w-[340px] mx-auto px-4 relative mb-6 select-none no-drag">
+                <div className="flex items-center justify-between w-full max-w-[340px] mx-auto px-4 relative mb-3 select-none no-drag">
                     
                     {/* LEFT WHEEL: Volume Tube */}
                     <div className="flex flex-col items-center gap-2 group">
@@ -714,31 +720,114 @@ export const ListeningStudyView: React.FC<ListeningStudyViewProps> = ({ onBack, 
 
 
 
-                  {/* Subtitle / HUD reading frame */}
-                  <div className="px-4 text-center mt-4 w-full min-h-[55px] flex flex-col justify-center bg-black/25 border border-white/5 rounded-2xl py-2 relative z-10 backdrop-blur-md">
-                    <button
-                      onClick={(e) => {
-                        const currentLine = getActiveTranscriptLine();
-                        if (currentLine) handleTTS(currentLine.textIt, e);
+                  {/* Subtitle / HUD reading frame with visibility toggles */}
+                  <div className="relative w-full mt-2">
+                    {/* Subtitle Settings Toggle */}
+                    <button 
+                      onClick={() => setShowSubControls(!showSubControls)}
+                      className="absolute -top-9 right-2 p-1.5 rounded-full backdrop-blur-md transition-all duration-200 z-20 hover:scale-110 active:scale-95"
+                      style={{
+                        background: showSubControls ? `${activeTrack.color}30` : 'rgba(0,0,0,0.3)',
+                        border: `1px solid ${showSubControls ? `${activeTrack.color}50` : 'rgba(255,255,255,0.08)'}`,
+                        boxShadow: showSubControls ? `0 0 12px ${activeTrack.color}25` : 'none'
                       }}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 p-2 hover:bg-white/5 rounded-xl text-[#60efff] active:scale-95 transition-transform"
-                      title="Pronuncia frase completa"
+                      title="Impostazioni sottotitoli"
                     >
-                      <Volume2 size={15} />
+                      <Settings2 size={14} className="transition-colors duration-200" style={{ color: showSubControls ? activeTrack.color : 'rgba(255,255,255,0.5)' }} />
                     </button>
-                    
-                    <div className="pr-8 pl-2">
-                      <p className="text-[13.5px] font-bold text-white tracking-tight leading-tight">
-                        {getActiveTranscriptLine()?.textIt || "Sintonizzazione..."}
-                      </p>
-                      <p className="text-[11px] text-zinc-400 italic mt-0.5 leading-tight">
-                        {getActiveTranscriptLine()?.textEn}
-                      </p>
+
+                    {/* Subtitle Visibility Controls Popover */}
+                    <AnimatePresence>
+                      {showSubControls && (
+                        <motion.div
+                          initial={{ opacity: 0, scale: 0.9, y: 5 }}
+                          animate={{ opacity: 1, scale: 1, y: 0 }}
+                          exit={{ opacity: 0, scale: 0.9, y: 5 }}
+                          transition={{ duration: 0.15 }}
+                          className="absolute -top-[5.5rem] right-2 flex flex-col gap-1 p-2 rounded-xl z-30 border"
+                          style={{
+                            background: 'rgba(0,0,0,0.7)',
+                            backdropFilter: 'blur(20px)',
+                            WebkitBackdropFilter: 'blur(20px)',
+                            borderColor: `${activeTrack.color}25`
+                          }}
+                        >
+                          <button 
+                            onClick={() => setShowItalianSub(!showItalianSub)} 
+                            className="flex items-center gap-2 text-xs text-white p-1.5 rounded-lg transition-all hover:bg-white/10"
+                            style={{ color: showItalianSub ? activeTrack.color : 'rgba(255,255,255,0.4)' }}
+                          >
+                            {showItalianSub ? <Eye size={13} /> : <EyeOff size={13} />}
+                            <span className="font-semibold text-[11px]">Italiano</span>
+                          </button>
+                          <button 
+                            onClick={() => setShowEnglishSub(!showEnglishSub)} 
+                            className="flex items-center gap-2 text-xs text-white p-1.5 rounded-lg transition-all hover:bg-white/10"
+                            style={{ color: showEnglishSub ? activeTrack.color : 'rgba(255,255,255,0.4)' }}
+                          >
+                            {showEnglishSub ? <Eye size={13} /> : <EyeOff size={13} />}
+                            <span className="font-semibold text-[11px]">English</span>
+                          </button>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+
+                    {/* Main Subtitle Display with Fade Mask */}
+                    <div 
+                      className="relative overflow-hidden px-4 py-3 min-h-[55px] flex flex-col justify-center rounded-2xl border relative z-10"
+                      style={{
+                        background: 'rgba(0,0,0,0.25)',
+                        backdropFilter: 'blur(12px)',
+                        WebkitBackdropFilter: 'blur(12px)',
+                        borderColor: `${activeTrack.color}10`,
+                        maskImage: 'linear-gradient(to top, transparent 0%, black 15%, black 100%)',
+                        WebkitMaskImage: 'linear-gradient(to top, transparent 0%, black 15%, black 100%)'
+                      }}
+                    >
+                      {/* TTS Button */}
+                      <button
+                        onClick={(e) => {
+                          const currentLine = getActiveTranscriptLine();
+                          if (currentLine) handleTTS(currentLine.textIt, e);
+                        }}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 p-2 hover:bg-white/5 rounded-xl active:scale-95 transition-transform"
+                        style={{ color: activeTrack.color }}
+                        title="Pronuncia frase completa"
+                      >
+                        <Volume2 size={15} />
+                      </button>
+                      
+                      <div className="pr-8 pl-2 flex flex-col gap-1 transition-all duration-500">
+                        {showItalianSub && (
+                          <motion.p 
+                            key={`it-${getActiveTranscriptLine()?.textIt}`}
+                            initial={{ opacity: 0, y: 4 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="text-[13.5px] font-bold text-white tracking-tight leading-tight drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]"
+                          >
+                            {getActiveTranscriptLine()?.textIt || "Sintonizzazione..."}
+                          </motion.p>
+                        )}
+                        {showEnglishSub && (
+                          <motion.p 
+                            key={`en-${getActiveTranscriptLine()?.textEn}`}
+                            initial={{ opacity: 0, y: 4 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="text-[11px] italic mt-0.5 leading-tight drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]"
+                            style={{ color: `${activeTrack.color}99` }}
+                          >
+                            {getActiveTranscriptLine()?.textEn}
+                          </motion.p>
+                        )}
+                        {!showItalianSub && !showEnglishSub && (
+                          <p className="text-[11px] text-white/20 italic">Sottotitoli nascosti</p>
+                        )}
+                      </div>
                     </div>
                   </div>
 
                 {/* Lower Segment Tabs (Trascrzione | Vocabolario | Sfida) */}
-                <div className="flex-1 flex flex-col min-h-0 mt-6 bg-[#020617]/40 border-t border-white/5 rounded-t-[36px] overflow-hidden">
+                <div className="flex-1 flex flex-col min-h-0 mt-3 bg-[#020617]/40 border-t border-white/5 rounded-t-[36px] overflow-hidden">
                   
                   {/* Tab list selectors */}
                   <div className="flex items-center justify-around border-b border-white/5 py-3 shrink-0">

@@ -24,13 +24,13 @@ export const BottomNav: React.FC<BottomNavProps> = ({
   onOpenLab
 }) => {
   const leftTabs = [
-    { id: 'dashboard', icon: BookOpen, label: 'Revise' },
-    { id: 'discover', icon: Compass, label: 'Discover' },
+    { id: 'dashboard', icon: BookOpen, label: 'Ecosystem' },
+    { id: 'discover', icon: Compass, label: 'Discovery' },
   ] as const;
 
   const rightTabs = [
-    { id: 'dictionary', icon: BookA, label: 'Dictionary' },
     { id: 'salotto', icon: Users, label: 'Il Salotto' },
+    { id: 'dictionary', icon: BookA, label: 'Dictionary' },
   ] as const;
 
   // Get color for status dot based on portal state
