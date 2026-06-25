@@ -1,20 +1,28 @@
+npm install
+npm run dev
 <div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
+  
+  <h1>ilLibro: Human-Agent Synergy</h1>
+  <p><strong>Language Learning & Exploration Platform</strong></p>
+
 </div>
 
-# Run and deploy your AI Studio app
+---
 
-This contains everything you need to run your app locally.
+### Description
 
-View your app in AI Studio: https://ai.studio/apps/8bfd334c-c0d4-431a-b3a0-ce76b79b05ad
+This project represents a unique fusion of human intent and agentic intelligence. It is built with React to create a seamless interface where users and AI agents collaborate to enhance language learning and exploration.
 
-## Run Locally
+**این پروژه نمایانگر ادغام منحصر به فرد قصد انسانی و هوش عاملی (Agentic) است.** این اپلیکیشن با استفاده از React ساخته شده است تا رابط کاربری یکپارچه‌ای ایجاد کند که در آن کاربران و ایجنت‌های هوش مصنوعی برای بهبود یادگیری زبان با یکدیگر همکاری می‌کنند.
 
-**Prerequisites:**  Node.js
+**Questo progetto rappresenta una fusione unica tra l'intento umano e l'intelligenza agente.** È stato realizzato con React per creare un'interfaccia fluida in cui utenti e agenti IA collaborano per migliorare l'apprendimento delle lingue.
 
+---
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+### 🚀 Getting Started
+
+To run this project locally, follow these steps:
+
+1. **Clone the repository:**
+   ```bash
+   git clone [your-repository-url]
