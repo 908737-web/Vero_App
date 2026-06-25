@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="https://(https://drive.google.com/file/d/19HXtILN4bZEHdDVDNVSZg1JkbgsyNWqS/view?usp=sharing)" alt="ilLibro Banner" width="800" />
+  <img src="https://[https://drive.google.com/file/d/19HXtILN4bZEHdDVDNVSZg1JkbgsyNWqS/view?usp=sharing]" alt="ilLibro Banner" width="800" />
   
   <h1>ilLibro: Human-Agent Synergy</h1>
   <p><strong>Un Ecosistema Digitale per l'Apprendimento Linguistico</strong></p>
