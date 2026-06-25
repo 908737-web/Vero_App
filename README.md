@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" alt="ilLibro Banner" width="800" />
+  <img src="https://(https://drive.google.com/file/d/19HXtILN4bZEHdDVDNVSZg1JkbgsyNWqS/view?usp=sharing)" alt="ilLibro Banner" width="800" />
   
   <h1>ilLibro: Human-Agent Synergy</h1>
   <p><strong>Un Ecosistema Digitale per l'Apprendimento Linguistico</strong></p>
@@ -39,4 +39,4 @@ Questo progetto rappresenta un ecosistema educativo progettato per superare il s
 
 1. Clone the repository:
    ```bash
-   git clone <your-repo-url>
+   git clone <(https://github.com/908737-web/Vero_App)>
